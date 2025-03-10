@@ -72,26 +72,33 @@ def get_model_instance(provider: str, model: str, api_key: str, num_ctx: int = 1
     else:
         raise ValueError("Unsupported provider")
 
-async def run_agent(task: str, llm, use_vision: Optional[bool], save_conversation_path: Optional[str]):
-    """Run the Browser-Use agent asynchronously with optional parameters."""
-    agent = Agent(
-        task=task,
-        llm=llm,
-        use_vision=use_vision if use_vision is not None else False,
-        save_conversation_path=save_conversation_path if save_conversation_path else None
-    )
+async def run_agent(task: str, llm):
+    """Run the Browser-Use agent asynchronously."""
+    agent = Agent(task=task, llm=llm)
     await agent.run()
 
 def main():
     st.title("LLM Selection Interface")
     
+    # Initialize session state for models if not already present
+    if 'fetched_models' not in st.session_state:
+        st.session_state.fetched_models = {}
+    
     # LLM Provider Selection
     provider = st.selectbox("Select LLM Provider", list(LLM_PROVIDERS.keys()))
     
+    # Reset models if provider changes
+    if 'current_provider' not in st.session_state or st.session_state.current_provider != provider:
+        st.session_state.current_provider = provider
+        st.session_state.fetched_models[provider] = LLM_PROVIDERS.get(provider, [])
+    
     # Model Selection
-    models = LLM_PROVIDERS.get(provider, [])
+    models = st.session_state.fetched_models.get(provider, LLM_PROVIDERS.get(provider, []))
     if st.button("Fetch Latest Models"):
-        models = fetch_latest_models(provider)
+        fetched_models = fetch_latest_models(provider)
+        st.session_state.fetched_models[provider] = fetched_models
+        models = fetched_models
+    
     model = st.selectbox("Select a Model", models, index=0)
     custom_model = st.text_input("Or enter a custom model", "")
     selected_model = custom_model if custom_model else model
@@ -110,10 +117,6 @@ def main():
     # Number of context tokens (only for Ollama)
     num_ctx = st.number_input("Number of Context Tokens (for Ollama only)", min_value=512, max_value=32768, value=16000)
     
-    # Agent Settings
-    use_vision = st.checkbox("Enable Vision Capabilities", help="Enable/disable vision capabilities. Recommended for better web interaction understanding but can increase costs.")
-    save_conversation_path = st.text_input("Save Conversation Path", "", help="Path to save the complete conversation history. Useful for debugging.")
-    
     # Instruction Input
     instructions = st.text_area("Enter instructions:")
     
@@ -121,7 +124,7 @@ def main():
     if st.button("Run"):
         if temp_api_key:
             llm_instance = get_model_instance(provider, selected_model, temp_api_key, num_ctx)
-            asyncio.run(run_agent(instructions, llm_instance, use_vision, save_conversation_path))
+            asyncio.run(run_agent(instructions, llm_instance))
         else:
             st.error("API key is required to run the agent.")
     
