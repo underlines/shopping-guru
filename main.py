@@ -72,9 +72,14 @@ def get_model_instance(provider: str, model: str, api_key: str, num_ctx: int = 1
     else:
         raise ValueError("Unsupported provider")
 
-async def run_agent(task: str, llm):
+async def run_agent(task: str, llm, use_vision: Optional[bool], save_conversation_path: Optional[str]):
     """Run the Browser-Use agent asynchronously."""
-    agent = Agent(task=task, llm=llm)
+    agent = Agent(
+        task=task,
+        llm=llm,
+        use_vision=use_vision if use_vision is not None else False,
+        save_conversation_path=save_conversation_path if save_conversation_path else None
+    )
     await agent.run()
 
 def main():
@@ -116,7 +121,11 @@ def main():
     
     # Number of context tokens (only for Ollama)
     num_ctx = st.number_input("Number of Context Tokens (for Ollama only)", min_value=512, max_value=32768, value=16000)
-    
+
+    # Agent Settings
+    use_vision = st.checkbox("Enable Vision Capabilities", help="Enable/disable vision capabilities. Recommended for better web interaction understanding but can increase costs.")
+    save_conversation_path = st.text_input("Save Conversation Path", "", help="Path to save the complete conversation history. Useful for debugging.")
+
     # Instruction Input
     instructions = st.text_area("Enter instructions:")
     
@@ -124,7 +133,7 @@ def main():
     if st.button("Run"):
         if temp_api_key:
             llm_instance = get_model_instance(provider, selected_model, temp_api_key, num_ctx)
-            asyncio.run(run_agent(instructions, llm_instance))
+            asyncio.run(run_agent(instructions, llm_instance, use_vision, save_conversation_path))
         else:
             st.error("API key is required to run the agent.")
     
