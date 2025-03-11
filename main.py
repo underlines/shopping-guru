@@ -7,7 +7,7 @@ import os
 import asyncio
 import requests
 import openai
-from browser_use import Agent
+from browser_use import Agent, Browser
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -72,15 +72,16 @@ def get_model_instance(provider: str, model: str, api_key: str, num_ctx: int = 1
     else:
         raise ValueError("Unsupported provider")
 
-async def run_agent(task: str, llm, use_vision: Optional[bool], save_conversation_path: Optional[str]):
-    """Run the Browser-Use agent asynchronously."""
+async def run_agent(task: str, llm, use_vision: Optional[bool], save_conversation_path: Optional[str], max_steps: int = 3):
+    """Run the Browser-Use agent asynchronously and return the result."""
     agent = Agent(
         task=task,
         llm=llm,
         use_vision=use_vision if use_vision is not None else False,
         save_conversation_path=save_conversation_path if save_conversation_path else None
     )
-    await agent.run()
+    result = await agent.run(max_steps=max_steps)
+    return result
 
 def main():
     st.title("LLM Selection Interface")
@@ -126,6 +127,15 @@ def main():
     use_vision = st.checkbox("Enable Vision Capabilities", help="Enable/disable vision capabilities. Recommended for better web interaction understanding but can increase costs.")
     save_conversation_path = st.text_input("Save Conversation Path", "", help="Path to save the complete conversation history. Useful for debugging.")
 
+    # Max Steps Input
+    max_steps = st.number_input(
+        "Maximum Steps",
+        min_value=1,
+        max_value=100,
+        value=3,
+        help="Maximum number of steps the agent can take during execution. This prevents infinite loops and helps control execution time."
+    )
+
     # Instruction Input
     instructions = st.text_area("Enter instructions:")
     
@@ -133,7 +143,8 @@ def main():
     if st.button("Run"):
         if temp_api_key:
             llm_instance = get_model_instance(provider, selected_model, temp_api_key, num_ctx)
-            asyncio.run(run_agent(instructions, llm_instance, use_vision, save_conversation_path))
+            result = asyncio.run(run_agent(instructions, llm_instance, use_vision, save_conversation_path, max_steps))
+            st.text_area("Result", value=result, height=300)
         else:
             st.error("API key is required to run the agent.")
     
