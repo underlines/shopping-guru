@@ -16,7 +16,7 @@ from pydantic import SecretStr
 from google import genai
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Define LLM providers and models
 LLM_PROVIDERS: Dict[str, list[str]] = {
